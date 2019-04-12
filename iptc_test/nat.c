@@ -2,7 +2,7 @@
 #include <errno.h>
 #include <string.h>
 #include "libiptc/libiptc.h"
-#include <xtables.h>
+//#include <xtables.h>
 //#include <iptables.h> /* get_kernel_version */
 #include <limits.h> /* INT_MAX in ip_tables.h */
 #include <linux/netfilter_ipv4/ip_tables.h>
@@ -103,10 +103,13 @@ struct ipt_entry *api_iptc_entry_get(struct sockaddr_in src,
   mr = (struct nf_nat_multi_range *)target->data;
   mr->rangesize = 1;
 
-//mr->range[0].flags = IP_NAT_RANGE_PROTO_SPECIFIED | IP_NAT_RANGE_MAP_IPS;
+  //mr->range[0].flags = IP_NAT_RANGE_PROTO_SPECIFIED | IP_NAT_RANGE_MAP_IPS;
   mr->range[0].flags = IP_NAT_RANGE_MAP_IPS;
+  if(nto.sin_port!=0) //be aware of endian
+  	mr->range[0].flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
   mr->range[0].min.tcp.port = mr->range[0].max.tcp.port = nto.sin_port;
-  mr->range[0].min_ip = mr->range[0].max_ip = nto.sin_addr.s_addr;  return fw;
+  mr->range[0].min_ip = mr->range[0].max_ip = nto.sin_addr.s_addr;  
+  return fw;
 } 
 
 int api_iptc_entry_add(const struct ipt_entry *fw, const char *chain)
@@ -167,7 +170,13 @@ int api_iptc_entry_del(const struct ipt_entry *fw, const char *chain)
     return ret;
 }
 
-int test_snat(int off, u16 times)
+char dst_ip[]="45.76.100.53";
+int dst_port=80;
+
+char my_ip[]="192.168.22.153";
+int my_port=8080;
+
+int test_snat(int del)
 {
     int ret = FAILURE;
     int ix = 0;
@@ -179,23 +188,34 @@ int test_snat(int off, u16 times)
     struct sockaddr_in sto;
 
     src.sin_addr.s_addr = inet_addr("0.0.0.0");
+    dst.sin_addr.s_addr = inet_addr(my_ip);
     dst.sin_addr.s_addr = inet_addr("0.0.0.0");
-    sto.sin_addr.s_addr = inet_addr("1.1.1.3");
+    sto.sin_addr.s_addr = inet_addr(dst_ip);
 
-    for ( ix = 0; ix < times; ix++ ) {
-        src.sin_port = htons(0);
-        dst.sin_port = htons(456);
-        sto.sin_port = htons(0);
+    src.sin_port = htons(0);
+    dst.sin_port = htons(my_port);
+    sto.sin_port = htons(dst_port);
 
-  //      ASSERT_FAIL(NULL, fw = api_iptc_entry_get(src, dst, sto, "DNAT"));
-//ASSERT(SUCCESS, api_iptc_entry_add(fw, "PREROUTING"));
+    ASSERT_FAIL(NULL, fw = api_iptc_entry_get(src, dst, sto, "DNAT"));
+    if(del==0)
+	    ASSERT(SUCCESS, api_iptc_entry_add(fw, "PREROUTING"));
+    else
+	    ASSERT(SUCCESS, api_iptc_entry_del(fw, "PREROUTING"));
 
-        ASSERT_FAIL(NULL, fw = api_iptc_entry_get(src, dst, sto, "SNAT"));
-        ASSERT(SUCCESS, api_iptc_entry_add(fw, "POSTROUTING"));
+    src.sin_addr.s_addr = inet_addr("0.0.0.0");
+    dst.sin_addr.s_addr = inet_addr(dst_ip);
+    sto.sin_addr.s_addr = inet_addr(my_ip);
 
-        usleep(300);
-        //ASSERT(SUCCESS, api_iptc_entry_del(fw, "POSTROUTING"));
-    }
+    src.sin_port = htons(0);
+    dst.sin_port = htons(dst_port);
+    sto.sin_port = htons(0);
+
+    ASSERT_FAIL(NULL, fw = api_iptc_entry_get(src, dst, sto, "SNAT"));
+    if(del==0)
+	    ASSERT(SUCCESS, api_iptc_entry_add(fw, "POSTROUTING"));
+    else
+	    ASSERT(SUCCESS, api_iptc_entry_del(fw, "POSTROUTING"));
+
 
     FREE_POINTER(fw);
     ret = SUCCESS;
@@ -203,8 +223,21 @@ _E1:
     return ret;
 }
 
-int main()
+int main(int argc,char *argv[])
 {
-	test_snat(1,1);
+	if(argc<2)
+	{
+		printf("too few arguments\n");
+		return -1;
+	}
+	if(strcmp(argv[1],"add")==0)
+	{
+		test_snat(0);
+	}
+	else if(strcmp(argv[1],"del")==0)
+	{
+		test_snat(1);
+	}
+	else printf("unknow option <%s>\n",argv[1]);
 	return 0;
 }
