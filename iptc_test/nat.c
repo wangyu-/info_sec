@@ -5,8 +5,10 @@
 //#include <xtables.h>
 //#include <iptables.h> /* get_kernel_version */
 #include <limits.h> /* INT_MAX in ip_tables.h */
-#include <linux/netfilter_ipv4/ip_tables.h>
+//#include <linux/netfilter_ipv4/ip_tables.h>
 #include <net/netfilter/nf_nat.h>
+#include <assert.h>
+#include <malloc.h>
 
 typedef unsigned int u32;
 typedef unsigned short u16;
@@ -15,9 +17,6 @@ typedef unsigned short u16;
 #define SUCCESS 0
 #define LOGW printf
 #define LOGE printf
-#define FREE_POINTER 
-#define ASSERT
-#define ASSERT_FAIL
 struct ipt_entry *api_iptc_entry_get(struct sockaddr_in src,
         struct sockaddr_in dst, struct sockaddr_in nto, const char *option)
 {
@@ -166,7 +165,7 @@ int api_iptc_entry_del(const struct ipt_entry *fw, const char *chain)
         ret = FAILURE;
     }
 
-    FREE_POINTER(matchmask);
+    free(matchmask);
     return ret;
 }
 
@@ -196,11 +195,11 @@ int test_snat(int del)
     dst.sin_port = htons(my_port);
     sto.sin_port = htons(dst_port);
 
-    ASSERT_FAIL(NULL, fw = api_iptc_entry_get(src, dst, sto, "DNAT"));
+    assert(fw = api_iptc_entry_get(src, dst, sto, "DNAT"));
     if(del==0)
-	    ASSERT(SUCCESS, api_iptc_entry_add(fw, "PREROUTING"));
+	    assert(api_iptc_entry_add(fw, "PREROUTING")==0);
     else
-	    ASSERT(SUCCESS, api_iptc_entry_del(fw, "PREROUTING"));
+	    assert(api_iptc_entry_del(fw, "PREROUTING")==0);
 
     src.sin_addr.s_addr = inet_addr("0.0.0.0");
     dst.sin_addr.s_addr = inet_addr(dst_ip);
@@ -210,14 +209,14 @@ int test_snat(int del)
     dst.sin_port = htons(dst_port);
     sto.sin_port = htons(0);
 
-    ASSERT_FAIL(NULL, fw = api_iptc_entry_get(src, dst, sto, "SNAT"));
+    assert(fw = api_iptc_entry_get(src, dst, sto, "SNAT"));
     if(del==0)
-	    ASSERT(SUCCESS, api_iptc_entry_add(fw, "POSTROUTING"));
+	    assert(api_iptc_entry_add(fw, "POSTROUTING")==0);
     else
-	    ASSERT(SUCCESS, api_iptc_entry_del(fw, "POSTROUTING"));
+	    assert(api_iptc_entry_del(fw, "POSTROUTING")==0);
 
 
-    FREE_POINTER(fw);
+    free(fw);
     ret = SUCCESS;
 _E1:
     return ret;
