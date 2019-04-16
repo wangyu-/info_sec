@@ -10,13 +10,15 @@
 #include <assert.h>
 #include <malloc.h>
 
-typedef unsigned int u32;
-typedef unsigned short u16;
+typedef unsigned int u32_t;
+typedef unsigned short u16_t;
 
-#define FAILURE -1
-#define SUCCESS 0
-#define LOGW printf
-#define LOGE printf
+char my_ip[]="192.168.22.153";
+int my_port=8080;
+
+char dst_ip[]="45.76.100.53";
+int dst_port=80;
+
 struct ipt_entry *api_iptc_entry_get(struct sockaddr_in src,
         struct sockaddr_in dst, struct sockaddr_in nto, const char *option)
 {
@@ -28,18 +30,18 @@ struct ipt_entry *api_iptc_entry_get(struct sockaddr_in src,
     struct ipt_entry_target *target = NULL;
     struct nf_nat_multi_range *mr = NULL;
 
-    u32 size1 = XT_ALIGN(sizeof(struct ipt_entry));
-    u32 size2 = XT_ALIGN(sizeof(struct ipt_entry_match) + sizeof(struct ipt_tcp));
-    u32 size3 = XT_ALIGN(sizeof(struct ipt_entry_target) + sizeof(struct nf_nat_multi_range));
+    u32_t size1 = XT_ALIGN(sizeof(struct ipt_entry));
+    u32_t size2 = XT_ALIGN(sizeof(struct ipt_entry_match) + sizeof(struct ipt_tcp));
+    u32_t size3 = XT_ALIGN(sizeof(struct ipt_entry_target) + sizeof(struct nf_nat_multi_range));
 
     if ( !option ) {
-        LOGW("NULL\n");
+        printf("error: option is null\n");
         return NULL;
     }
 
-    fw = calloc(1, size1 + size2 + size3);
+    fw = calloc(1,size1 + size2 + size3);
     if ( !fw ) {
-        LOGE("Malloc failure");
+        printf("malloc failed");
         return NULL;
     }
 
@@ -63,7 +65,7 @@ struct ipt_entry *api_iptc_entry_get(struct sockaddr_in src,
     }
 
     fw->ip.proto = IPPROTO_TCP;
-  fw->nfcache = NFC_UNKNOWN; /*Think this stops caching. */
+    fw->nfcache = NFC_UNKNOWN; /*Think this stops caching. */
 
 
   /* TCP specific matching(ie. ports) */
@@ -113,42 +115,42 @@ struct ipt_entry *api_iptc_entry_get(struct sockaddr_in src,
 
 int api_iptc_entry_add(const struct ipt_entry *fw, const char *chain)
 {
-    int ret = FAILURE;
+    int ret = -1;
     struct xtc_handle *phandle = NULL;
  
     if ( !fw || !chain ) {
-        LOGW("NULL\n");
-        return FAILURE;
+        printf("error: null pointer\n");
+        return -1;
     }
  
     if ( (phandle = iptc_init("nat")) &&
          iptc_append_entry(chain, fw, phandle) &&
          iptc_commit(phandle) ) {
-        ret = SUCCESS;
+        ret = 0;
     }
     else {
-        LOGW("%s\n", iptc_strerror(errno));
-        ret = FAILURE;
+        printf("error: %s\n", iptc_strerror(errno));
+        ret = -1;
     }
     return ret;
 }
 
 int api_iptc_entry_del(const struct ipt_entry *fw, const char *chain)
 {
-    int ret = FAILURE;
+    int ret = -1;
 
     unsigned char *matchmask = NULL;
 
     struct xtc_handle *phandle = NULL;
 
     if ( !fw || !chain ) {
-        LOGW("NULL\n");
-        return FAILURE;
+        printf("null pointer\n");
+        return -1;
     }
 
-    matchmask = calloc(1, fw->next_offset);
+    matchmask = calloc(1,fw->next_offset);
     if ( !matchmask ) {
-        return FAILURE;
+        return -1;
     }
 
     if ( !phandle ) {
@@ -158,26 +160,20 @@ int api_iptc_entry_del(const struct ipt_entry *fw, const char *chain)
     if ( (phandle = iptc_init("nat")) &&
          iptc_delete_entry(chain, fw, matchmask, phandle) &&
          iptc_commit(phandle) ) {
-        ret = SUCCESS;
+        ret = 0;
     }
     else {
-        LOGW("%s\n", iptc_strerror(errno));
-        ret = FAILURE;
+        printf("error: %s\n", iptc_strerror(errno));
+        ret = -1;
     }
 
     free(matchmask);
     return ret;
 }
 
-char dst_ip[]="45.76.100.53";
-int dst_port=80;
-
-char my_ip[]="192.168.22.153";
-int my_port=8080;
-
 int test_snat(int del)
 {
-    int ret = FAILURE;
+    int ret = -1;
     int ix = 0;
 
     struct ipt_entry *fw = NULL;
@@ -217,7 +213,7 @@ int test_snat(int del)
 
 
     free(fw);
-    ret = SUCCESS;
+    ret = 0;
 _E1:
     return ret;
 }
