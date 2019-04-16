@@ -113,7 +113,7 @@ struct ipt_entry *api_iptc_entry_get(struct sockaddr_in src,
   return fw;
 } 
 
-int api_iptc_entry_add(const struct ipt_entry *fw, const char *chain)
+int api_iptc_entry_add(const struct ipt_entry *fw, const char * table, const char *chain)
 {
     int ret = -1;
     struct xtc_handle *phandle = NULL;
@@ -123,7 +123,7 @@ int api_iptc_entry_add(const struct ipt_entry *fw, const char *chain)
         return -1;
     }
  
-    if ( (phandle = iptc_init("nat")) &&
+    if ( (phandle = iptc_init(table)) &&
          iptc_append_entry(chain, fw, phandle) &&
          iptc_commit(phandle) ) {
         ret = 0;
@@ -135,7 +135,7 @@ int api_iptc_entry_add(const struct ipt_entry *fw, const char *chain)
     return ret;
 }
 
-int api_iptc_entry_del(const struct ipt_entry *fw, const char *chain)
+int api_iptc_entry_del(const struct ipt_entry *fw, const char *table, const char *chain)
 {
     int ret = -1;
 
@@ -154,10 +154,10 @@ int api_iptc_entry_del(const struct ipt_entry *fw, const char *chain)
     }
 
     if ( !phandle ) {
-        phandle = iptc_init("nat");
+        phandle = iptc_init(table);
     }
 
-    if ( (phandle = iptc_init("nat")) &&
+    if ( (phandle = iptc_init(table)) &&
          iptc_delete_entry(chain, fw, matchmask, phandle) &&
          iptc_commit(phandle) ) {
         ret = 0;
@@ -193,9 +193,9 @@ int test_snat(int del)
 
     assert(fw = api_iptc_entry_get(src, dst, sto, "DNAT"));
     if(del==0)
-	    assert(api_iptc_entry_add(fw, "PREROUTING")==0);
+	    assert(api_iptc_entry_add(fw,"nat","PREROUTING")==0);
     else
-	    assert(api_iptc_entry_del(fw, "PREROUTING")==0);
+	    assert(api_iptc_entry_del(fw,"nat","PREROUTING")==0);
 
     src.sin_addr.s_addr = inet_addr("0.0.0.0");
     dst.sin_addr.s_addr = inet_addr(dst_ip);
@@ -207,9 +207,9 @@ int test_snat(int del)
 
     assert(fw = api_iptc_entry_get(src, dst, sto, "SNAT"));
     if(del==0)
-	    assert(api_iptc_entry_add(fw, "POSTROUTING")==0);
+	    assert(api_iptc_entry_add(fw,"nat","POSTROUTING")==0);
     else
-	    assert(api_iptc_entry_del(fw, "POSTROUTING")==0);
+	    assert(api_iptc_entry_del(fw,"nat","POSTROUTING")==0);
 
 
     free(fw);
