@@ -1,8 +1,8 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
-//#include <linux/seq_file.h>
-//#include <linux/fs.h>
-//#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/fs.h>
+#include <linux/proc_fs.h>
 #include <net/tcp.h>
 #include <net/udp.h>
 
