@@ -9,7 +9,7 @@
 MODULE_LICENSE("GPL");
 
 const char proc_file[]= "/proc/net/tcp"; //you can change tcp to tcp6 or udp or udp6
-#define AFINFO struct tcp_seq_afinfo  //use this for tcp/tcp6.  ( there is a tcp6_seq_afinfo for v6, but tcp_seq_afinfo works
+#define AFINFO struct tcp_seq_afinfo  //use this for tcp/tcp6
 //#define AFINFO struct udp_seq_afinfo  //use this for udp/udp6
 
 int port=1234;
